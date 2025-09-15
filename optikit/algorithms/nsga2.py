@@ -4,18 +4,13 @@ from axo import Axo, axo_method
 
 
 class NSGA2(Axo):
-    def __init__(self, params, *args, **kwargs):
+    def __init__(self, runs , iters, m_objs, pop_size,verbose, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = params["name"]
-        self.label = params["label"]
-        self.runs = params["runs"]
-        self.iters = params["iters"]
-        self.m_objs = params["m_objs"]
-        self.pop_size = params["pop_size"]
-        self.params_mop = params["params_mop"]
-        self.params_crossover = params["params_crossover"]
-        self.params_mutation = params["params_mutation"]
-        self.verbose = params["verbose"]
+        self.runs = runs
+        self.iters = iters
+        self.m_objs = m_objs
+        self.pop_size = pop_size
+        self.verbose = verbose
         
     #se crea la poblacion aleatoriamente con las variables de decision 
     

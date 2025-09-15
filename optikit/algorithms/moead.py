@@ -1,11 +1,12 @@
 from optikit.algorithms.individual import Individual
-from optikit.algorithms.utils import init_weights, get_neighbors, scalarizing_chebyshev
+#from optikit.algorithms.utils import 
 import random
 import matplotlib.pyplot as plt
 from axo import Axo, axo_method
 
+
 class MOEAD(Axo):
-    def __init__(self, problem_func, n_var, bounds, n_gen=100, n_sub=100, T=20 , *args, **kwargs):
+    def __init__(self, problem_func, n_var, bounds, n_gen=100, n_sub=100, T=20 ,population = 50 ,*args, **kwargs):
         super().__init__(*args, **kwargs)
         self.problem_func = problem_func
         self.n_var = n_var
@@ -13,12 +14,9 @@ class MOEAD(Axo):
         self.n_gen = n_gen
         self.n_sub = n_sub
         self.T = T
-
-        self.weights = init_weights(n_sub)
-        self.neighbors = get_neighbors(self.weights, T)
-        self.population = [Individual(n_var, bounds) for _ in range(n_sub)]
-        for ind in self.population:
-            ind.evaluate(problem_func)
+        self.weights = MOEAD.init_weights(n_sub)
+        self.neighbors = MOEAD.get_neighbors(self.weights, T)
+        self.population = population
 
         self.z = [min([ind.f[i] for ind in self.population]) for i in range(2)]
 
@@ -36,8 +34,8 @@ class MOEAD(Axo):
 
                 # Reemplazo
                 for j in P:
-                    f1 = scalarizing_chebyshev(child.f, self.weights[j], self.z)
-                    f2 = scalarizing_chebyshev(self.population[j].f, self.weights[j], self.z)
+                    f1 = MOEAD.scalarizing_chebyshev(child.f, self.weights[j], self.z)
+                    f2 = MOEAD.scalarizing_chebyshev(self.population[j].f, self.weights[j], self.z)
                     if f1 < f2:
                         self.population[j] = child.copy()
 
@@ -48,7 +46,22 @@ class MOEAD(Axo):
 
     def get_pareto_front(self, **kwargs):
         return [ind.f for ind in self.population]
-    def plot(self):
+    
+    
+    @axo_method
+    async def plot(self, **kwargs):
+        
+        import matplotlib.pyplot as plt
+        import io
+        from uuid import uuid4
+        from axo.storage.services import MictlanXStorageService
+        
+        sink_bucket_id      = kwargs.get("sink_bucket_id","test" )
+        sink_key            = kwargs.get("sink_key", uuid4().hex)
+        
+        storage:MictlanXStorageService = kwargs.get("storage")
+        
+        
         pareto = self.get_pareto_front()
         f1_vals = [f[0] for f in pareto]
         f2_vals = [f[1] for f in pareto]
@@ -57,4 +70,34 @@ class MOEAD(Axo):
         plt.xlabel("f1")
         plt.ylabel("f2")
         plt.title("Pareto Front")
-        plt.savefig("pareto_front.png", dpi=300)
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png') 
+        buf.seek(0)
+        res = await storage.put(bucket_id=sink_bucket_id,key=sink_key,data=buf.getvalue())
+        return sink_bucket_id,sink_key
+    
+    @staticmethod
+    def euclidean_dist(a, b):
+        return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
+    @staticmethod
+    def init_weights(n_subproblems):
+        weights = []
+        for i in range(n_subproblems):
+            w = i / (n_subproblems - 1)
+            weights.append([w, 1 - w])
+        return weights
+
+    @staticmethod
+    def get_neighbors(weights, T):
+        neighbors = []
+        for i, w in enumerate(weights):
+            dists = [(j, MOEAD.euclidean_dist(w, weights[j])) for j in range(len(weights))]
+            dists.sort(key=lambda x: x[1])
+            neighbors.append([j for j, _ in dists[:T]])
+        return neighbors
+
+    @staticmethod
+    def scalarizing_chebyshev(f, weight, z):
+        return max(weight[i] * abs(f[i] - z[i]) for i in range(len(f)))
+

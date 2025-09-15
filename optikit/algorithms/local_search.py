@@ -1,8 +1,5 @@
-import matplotlib.pyplot as plt
-import os
-from axo import Axo, axo_method
 
-os.makedirs("img", exist_ok=True)
+from axo import Axo, axo_method
 
 
 class LocalSearch(Axo):
@@ -20,8 +17,9 @@ class LocalSearch(Axo):
 
     def conditional(self, x, **kwargs):
         return abs(x) == 0  
+    
     @axo_method
-    def local(self,show_plot:bool = False, **kwargs):
+    def local(self, **kwargs):
         s = self.x
         self.trayectoria.append(s)
         self.fx.append(self.obj_function(s))
@@ -51,7 +49,19 @@ class LocalSearch(Axo):
 
         print("Mejor solución encontrada:", s)
         return s
-    def plot(self):
+    
+    @axo_method
+    async def plot(self, **kwargs):
+        import io 
+        from uuid import uuid4
+        from axo.storage.services import MictlanXStorageService 
+        import matplotlib.pyplot as plt
+        
+        sink_bucket_id      = kwargs.get("sink_bucket_id", "test")
+        sink_key            = kwargs.get("sink_key",uuid4().hex)
+        
+        storage:MictlanXStorageService = kwargs.get("storage")
+        
         plt.figure(figsize=(8, 4))
         plt.plot(self.fx, marker='o', color='teal')
         plt.title("Convergencia de Búsqueda Local en $f(x) = x^2$")
@@ -59,36 +69,8 @@ class LocalSearch(Axo):
         plt.ylabel("f(x)")
         plt.grid()
         plt.tight_layout()
-        plt.show()
-
-#if __name__ == "__main__":
-#    busqueda = LocalSearch(x=50)
-#    resultado = busqueda.search()
-
-    # Gráfica de convergencia
-#    plt.figure(figsize=(8,4))
-#    plt.plot(busqueda.fx, marker='o', color='teal')
-#    plt.title("Convergencia de Búsqueda Local en $f(x) = x^2$")
-#    plt.xlabel("Iteración")
-#    plt.ylabel("f(x)")
-#    plt.grid()
-#    plt.tight_layout()
-#    plt.savefig("img/convergencia_local_search.png")
-#    plt.show()
-
-    # Gráfica de ruta sobre f(x)
-#    import numpy as np
-#    x = np.linspace(-55, 55, 400)
-#    y = x ** 2
-
-#    plt.figure(figsize=(8,4))
-#    plt.plot(x, y, label="f(x) = x²", color='lightgray')
-#    plt.plot(busqueda.trayectoria, busqueda.fx, marker='o', color='crimson', label="Ruta del algoritmo")
-#    plt.title("Ruta de exploración en $f(x) = x^2$")
-#    plt.xlabel("x")
-#    plt.ylabel("f(x)")
-#    plt.legend()
-#    plt.grid()
-#    plt.tight_layout()
-#    plt.savefig("img/ruta_local_search.png")
-#    plt.show()
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        res = await storage.put(bucket_id=sink_bucket_id,key=sink_key,data=buf.getvalue())
+        return sink_bucket_id,sink_key

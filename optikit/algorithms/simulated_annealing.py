@@ -1,5 +1,8 @@
 from axo import Axo,axo_method
 import matplotlib.pyplot as plt
+import random
+import math
+
 class SimulatedAnnealing(Axo):
     def __init__(self, solucion_inicial, temperatura, temperatura_minima, factor_enfriamiento,*args,**kwargs):
         super().__init__(*args,**kwargs)
@@ -20,8 +23,7 @@ class SimulatedAnnealing(Axo):
     
     @axo_method
     def simulated(self,**kwargs):
-        import random
-        import math
+
         self.iteracion = 0
         while self.temperatura > self.temperatura_minima:
             nueva_solucion = self.generar_vecino(self.solucion_inicial)
@@ -38,8 +40,21 @@ class SimulatedAnnealing(Axo):
             self.iteracion += 1
 
         return self.solucion_inicial, self.coste_actual, self.iteracion
-
-    def plot(self):
+    
+    @axo_method
+    async def plot(self,**kwargs):
+        
+        import matplotlib.pyplot as plt
+        import io
+        from uuid import uuid4
+        from axo.storage.services import MictlanXStorageService
+        
+        sink_bucket_id      = kwargs.get("sink_bucket_id", "test")
+        sink_key            = kwargs.get("sink_key", uuid4().hex)   
+        
+        storage:MictlanXStorageService = kwargs.get("storage")
+        
+        
         print(f"Solución encontrada: x = {self.solucion_inicial:.5f}")
         print(f"Coste final: f(x) = {self.coste_actual:.5f}")
         print(f"Iteraciones: {self.iteracion}")
@@ -49,4 +64,11 @@ class SimulatedAnnealing(Axo):
         plt.xlabel("Iteración")
         plt.ylabel("Coste f(x)")
         plt.grid(True)
-        plt.show()
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        
+        res = await storage.put(bucket_id=sink_bucket_id,key=sink_key,data=buf.getvalue())
+        return sink_bucket_id,sink_key
+        
+        
